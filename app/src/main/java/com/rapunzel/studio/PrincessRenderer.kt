@@ -11,7 +11,7 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.*
 
-class PrincessRenderer : GLSurfaceView.Renderer {
+class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceView.Renderer {
     @Volatile private var yaw = 0f
     @Volatile private var pitch = 0f
     @Volatile private var zoom = 5.6f
@@ -188,6 +188,8 @@ class PrincessRenderer : GLSurfaceView.Renderer {
         draw(0.95f,1.38f,0.16f,0.13f,0.14f,0.40f,1f,0.74f,0.18f)
     }
 
+    fun updateAppearance(value: CharacterAppearance) { appearance = value }
+
     private fun draw(x:Float,y:Float,z:Float,sx:Float,sy:Float,sz:Float,r:Float,g:Float,b:Float) {
         Matrix.setIdentityM(model,0)
         Matrix.rotateM(model,0,pitch,1f,0f,0f)
@@ -199,7 +201,20 @@ class PrincessRenderer : GLSurfaceView.Renderer {
         Matrix.multiplyMM(mvp,0,vp,0,model,0)
         GLES20.glUniformMatrix4fv(mvpHandle,1,false,mvp,0)
         GLES20.glUniformMatrix4fv(modelHandle,1,false,model,0)
-        GLES20.glUniform4f(colorHandle,r,g,b,1f)
+        // Material colors come from the independently updateable character resource pack.
+        var cr = r; var cg = g; var cb = b
+        if (r > 0.85f && g > 0.45f && b < 0.35f) {
+            val material = if (g > 0.73f) appearance.hairHighlight
+                else if (g < 0.65f) appearance.hairShadow else appearance.hair
+            cr = material[0]; cg = material[1]; cb = material[2]
+        } else if (r > 0.90f && g > 0.60f && b >= 0.35f) {
+            val material = if (g > 0.70f) appearance.skinLight else appearance.skin
+            cr = material[0]; cg = material[1]; cb = material[2]
+        } else if (b > 0.50f && r < 0.80f) {
+            val material = if (g > 0.35f) appearance.dressLight else appearance.dressDark
+            cr = material[0]; cg = material[1]; cb = material[2]
+        }
+        GLES20.glUniform4f(colorHandle,cr,cg,cb,1f)
         GLES20.glUniform3f(lightHandle,-0.4f,0.8f,0.7f)
         GLES20.glEnableVertexAttribArray(positionHandle)
         GLES20.glEnableVertexAttribArray(normalHandle)
