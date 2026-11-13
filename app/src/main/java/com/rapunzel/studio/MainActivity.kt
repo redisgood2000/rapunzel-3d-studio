@@ -24,7 +24,7 @@ class MainActivity : Activity() {
         val root = FrameLayout(this).apply { setBackgroundColor(Color.rgb(35, 19, 54)) }
         val gl = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
-            renderer = PrincessRenderer(ResourceManager.load(this))
+            renderer = PrincessRenderer(ResourceManager.load(this@MainActivity))
             setRenderer(renderer)
             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
         }
