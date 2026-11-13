@@ -25,6 +25,7 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
     private var normalHandle = 0
     private var mvpHandle = 0
     private var modelHandle = 0
+    private var modelViewHandle = 0
     private var colorHandle = 0
     private var lightHandle = 0
     private var sphere: FloatBuffer? = null
@@ -41,10 +42,14 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
         attribute vec3 aNormal;
         uniform mat4 uMVP;
         uniform mat4 uModel;
+        uniform mat4 uModelView;
         varying vec3 vNormal;
+        varying vec3 vEyePosition;
         void main() {
+            vec4 eyePosition = uModelView * vec4(aPosition, 1.0);
             gl_Position = uMVP * vec4(aPosition, 1.0);
-            vNormal = mat3(uModel) * aNormal;
+            vEyePosition = eyePosition.xyz;
+            vNormal = normalize(mat3(uModelView) * aNormal);
         }
     """.trimIndent()
     private val fragmentShader = """
@@ -52,10 +57,18 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
         uniform vec4 uColor;
         uniform vec3 uLight;
         varying vec3 vNormal;
+        varying vec3 vEyePosition;
         void main() {
-            float diffuse = max(dot(normalize(vNormal), normalize(uLight)), 0.0);
-            float light = 0.42 + 0.68 * diffuse;
-            gl_FragColor = vec4(uColor.rgb * light, uColor.a);
+            vec3 N = normalize(vNormal);
+            vec3 L = normalize(uLight);
+            vec3 V = normalize(-vEyePosition);
+            vec3 H = normalize(L + V);
+            float diffuse = max(dot(N, L), 0.0);
+            float specular = pow(max(dot(N, H), 0.0), 34.0) * 0.22;
+            float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0) * 0.10;
+            vec3 base = uColor.rgb;
+            vec3 lit = base * (0.34 + 0.72 * diffuse) + vec3(specular) + base * rim;
+            gl_FragColor = vec4(lit, uColor.a);
         }
     """.trimIndent()
 
@@ -72,6 +85,7 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
         normalHandle = GLES20.glGetAttribLocation(program, "aNormal")
         mvpHandle = GLES20.glGetUniformLocation(program, "uMVP")
         modelHandle = GLES20.glGetUniformLocation(program, "uModel")
+        modelViewHandle = GLES20.glGetUniformLocation(program, "uModelView")
         colorHandle = GLES20.glGetUniformLocation(program, "uColor")
         lightHandle = GLES20.glGetUniformLocation(program, "uLight")
         createSphere()
@@ -87,7 +101,7 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
 
     private fun createSphere() {
         val data = ArrayList<Float>()
-        val lat = 18; val lon = 24
+        val lat = 36; val lon = 48
         for (i in 0 until lat) {
             val a0 = -Math.PI / 2 + Math.PI * i / lat
             val a1 = -Math.PI / 2 + Math.PI * (i + 1) / lat
@@ -161,7 +175,9 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
             draw(s*0.50f,1.62f,0.08f,0.12f,0.13f,0.43f,0.98f,0.70f,0.16f)
             draw(s*0.47f,1.18f,0.05f,0.11f,0.12f,0.34f,0.98f,0.70f,0.16f)
         }
-        // Face features, eyes change by expression
+        // Face features: layered eyelids, brows, iris highlights and soft facial shaping
+        draw(-0.355f,3.22f,-0.245f,0.055f,0.105f,0.055f,0.88f,0.55f,0.43f)
+        draw(0.355f,3.22f,-0.245f,0.055f,0.105f,0.055f,0.88f,0.55f,0.43f)
         val eyeY = 3.31f
         val eyeScale = if(expression==1) 1.20f else 1f
         for (s in listOf(-1f,1f)) {
@@ -171,14 +187,21 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
                 draw(s*0.145f,eyeY,-0.326f,0.038f,0.052f*eyeScale,0.022f,0.12f,0.49f,0.28f)
                 draw(s*0.145f,eyeY,-0.345f,0.019f,0.031f*eyeScale,0.012f,0.025f,0.02f,0.02f)
                 draw(s*0.155f,eyeY+0.018f,-0.357f,0.009f,0.012f,0.008f,1f,1f,1f)
+                draw(s*0.145f,eyeY-0.085f,-0.337f,0.068f,0.014f,0.012f,0.30f,0.12f,0.09f)
             } else {
                 draw(s*0.145f,eyeY,-0.31f,0.075f,0.012f,0.018f,0.10f,0.035f,0.025f)
             }
-            draw(s*0.15f,3.45f,-0.27f,0.09f,0.025f,0.025f,0.48f,0.25f,0.07f)
+            draw(s*0.15f,3.455f,-0.292f,0.105f,0.027f,0.026f,0.36f,0.18f,0.07f)
             draw(s*0.25f,3.13f,-0.26f,0.07f,0.035f,0.025f,0.88f,0.39f,0.40f)
         }
-        draw(0f,3.19f,-0.31f,0.045f,0.055f,0.045f,1f,0.78f,0.64f)
-        draw(0f,3.04f,-0.30f,0.075f,if(expression==1)0.065f else 0.027f,0.025f,0.75f,0.22f,0.28f)
+        draw(0f,3.205f,-0.316f,0.034f,0.080f,0.034f,0.94f,0.66f,0.53f)
+        draw(0f,3.155f,-0.350f,0.042f,0.026f,0.026f,0.98f,0.71f,0.59f)
+        draw(-0.026f,3.145f,-0.363f,0.012f,0.008f,0.009f,0.72f,0.36f,0.32f)
+        draw(0.026f,3.145f,-0.363f,0.012f,0.008f,0.009f,0.72f,0.36f,0.32f)
+        draw(0f,3.045f,-0.326f,0.078f,if(expression==1)0.068f else 0.024f,0.026f,0.68f,0.16f,0.24f)
+        draw(0f,3.025f,-0.346f,0.052f,0.010f,0.012f,0.94f,0.39f,0.42f)
+        draw(-0.245f,3.12f,-0.285f,0.070f,0.035f,0.018f,1f,0.62f,0.57f)
+        draw(0.245f,3.12f,-0.285f,0.070f,0.035f,0.018f,1f,0.62f,0.57f)
         // Fringe and golden hair details
         for(i in -3..3) draw(i*0.095f,3.53f-abs(i)*0.012f,-0.25f,0.085f,0.12f,0.12f,1f,0.78f,0.25f)
         // Long braid behind shoulder, visible on right
@@ -201,6 +224,9 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
         Matrix.multiplyMM(mvp,0,vp,0,model,0)
         GLES20.glUniformMatrix4fv(mvpHandle,1,false,mvp,0)
         GLES20.glUniformMatrix4fv(modelHandle,1,false,model,0)
+        val modelView = FloatArray(16)
+        Matrix.multiplyMM(modelView, 0, view, 0, model, 0)
+        GLES20.glUniformMatrix4fv(modelViewHandle,1,false,modelView,0)
         // Material colors come from the independently updateable character resource pack.
         var cr = r; var cg = g; var cb = b
         if (r > 0.85f && g > 0.45f && b < 0.35f) {
@@ -215,7 +241,7 @@ class PrincessRenderer(private var appearance: CharacterAppearance) : GLSurfaceV
             cr = material[0]; cg = material[1]; cb = material[2]
         }
         GLES20.glUniform4f(colorHandle,cr,cg,cb,1f)
-        GLES20.glUniform3f(lightHandle,-0.4f,0.8f,0.7f)
+        GLES20.glUniform3f(lightHandle,-0.45f,0.82f,0.72f)
         GLES20.glEnableVertexAttribArray(positionHandle)
         GLES20.glEnableVertexAttribArray(normalHandle)
         sphere!!.position(0)
