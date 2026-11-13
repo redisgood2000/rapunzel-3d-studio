@@ -24,7 +24,7 @@ class MainActivity : Activity() {
         val root = FrameLayout(this).apply { setBackgroundColor(Color.rgb(35, 19, 54)) }
         val gl = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
-            renderer = PrincessRenderer()
+            renderer = PrincessRenderer(ResourceManager.load(this))
             setRenderer(renderer)
             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
         }
@@ -48,6 +48,7 @@ class MainActivity : Activity() {
         }
         addButton(topActions, "⟲ RESET") { renderer.resetView() }
         addButton(topActions, "▶ IDLE") { renderer.toggleAnimation() }
+        addButton(topActions, "⬇ UPDATE") { checkResources(true) }
         val topLp = FrameLayout.LayoutParams(-1, dp(54), Gravity.TOP).apply { topMargin = dp(78) }
         root.addView(topActions, topLp)
 
@@ -93,6 +94,18 @@ class MainActivity : Activity() {
             }
         }
         setContentView(root)
+        checkResources(false)
+    }
+
+    private fun checkResources(showCurrent: Boolean) {
+        ResourceManager.checkForUpdates(this) { updated, appearance, message ->
+            runOnUiThread {
+                if (updated && appearance != null) renderer.updateAppearance(appearance)
+                if (updated || showCurrent || message.startsWith("Resource update failed")) {
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun addButton(parent: LinearLayout, label: String, action: () -> Unit) {
