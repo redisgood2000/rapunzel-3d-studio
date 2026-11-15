@@ -1,126 +1,96 @@
 package com.rapunzel.studio
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.graphics.Color
-import android.view.Gravity
-import android.view.MotionEvent
-import android.view.View
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.FrameLayout
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
-import android.opengl.GLSurfaceView
 
 class MainActivity : Activity() {
-    private lateinit var renderer: PrincessRenderer
+    private lateinit var webView: WebView
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private val pickModelRequest = 4102
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.rgb(35, 19, 54)
         window.navigationBarColor = Color.rgb(35, 19, 54)
 
-        val root = FrameLayout(this).apply { setBackgroundColor(Color.rgb(35, 19, 54)) }
-        val gl = GLSurfaceView(this).apply {
-            setEGLContextClientVersion(2)
-            renderer = PrincessRenderer(ResourceManager.load(this@MainActivity))
-            setRenderer(renderer)
-            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-        }
-        root.addView(gl, FrameLayout.LayoutParams(-1, -1))
-
-        val title = TextView(this).apply {
-            text = "RAPUNZEL 3D STUDIO\nCHARACTER WORKSHOP"
-            setTextColor(Color.WHITE)
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setPadding(12, 18, 12, 14)
-            setBackgroundColor(Color.argb(175, 35, 19, 54))
-        }
-        root.addView(title, FrameLayout.LayoutParams(-1, dp(72), Gravity.TOP))
-
-        val topActions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(8, 6, 8, 6)
-            setBackgroundColor(Color.argb(165, 35, 19, 54))
-        }
-        addButton(topActions, "⟲ RESET") { renderer.resetView() }
-        addButton(topActions, "▶ IDLE") { renderer.toggleAnimation() }
-        addButton(topActions, "⬇ UPDATE") { checkResources(true) }
-        val topLp = FrameLayout.LayoutParams(-1, dp(54), Gravity.TOP).apply { topMargin = dp(78) }
-        root.addView(topActions, topLp)
-
-        val bottom = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(8, 10, 8, 12)
-            setBackgroundColor(Color.argb(220, 35, 19, 54))
-        }
-        val caption = TextView(this).apply {
-            text = "EXPRESSIONS"
-            setTextColor(Color.rgb(245, 213, 157))
-            textSize = 12f
-            gravity = Gravity.CENTER
-        }
-        bottom.addView(caption)
-        val expressions = LinearLayout(this).apply { gravity = Gravity.CENTER }
-        addButton(expressions, "😊 SMILE") { renderer.setExpression(0) }
-        addButton(expressions, "😮 WOW") { renderer.setExpression(1) }
-        addButton(expressions, "😉 WINK") { renderer.setExpression(2) }
-        bottom.addView(expressions)
-        val hint = TextView(this).apply {
-            text = "Drag to rotate  •  Pinch to zoom  •  Rotate the character to inspect"
-            setTextColor(Color.LTGRAY)
-            textSize = 11f
-            gravity = Gravity.CENTER
-            setPadding(4, 8, 4, 2)
-        }
-        bottom.addView(hint)
-        root.addView(bottom, FrameLayout.LayoutParams(-1, dp(116), Gravity.BOTTOM))
-
-        gl.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { renderer.touchDown(event.x, event.y); true }
-                MotionEvent.ACTION_POINTER_DOWN -> { renderer.pinchStart(event); true }
-                MotionEvent.ACTION_MOVE -> {
-                    if (event.pointerCount >= 2) renderer.pinchMove(event)
-                    else renderer.touchMove(event.x, event.y)
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { renderer.touchUp(); true }
-                else -> true
-            }
-        }
-        setContentView(root)
-        checkResources(false)
-    }
-
-    private fun checkResources(showCurrent: Boolean) {
-        ResourceManager.checkForUpdates(this) { updated, appearance, message ->
-            runOnUiThread {
-                if (updated && appearance != null) renderer.updateAppearance(appearance)
-                if (updated || showCurrent || message.startsWith("Resource update failed")) {
-                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        webView = WebView(this).apply {
+            setBackgroundColor(Color.rgb(35, 19, 54))
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = true
+            settings.allowContentAccess = true
+            settings.cacheMode = WebSettings.LOAD_DEFAULT
+            webViewClient = WebViewClient()
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    view: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    fileChooserCallback?.onReceiveValue(null)
+                    fileChooserCallback = filePathCallback
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                            "model/gltf-binary",
+                            "application/octet-stream"
+                        ))
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    }
+                    return try {
+                        startActivityForResult(intent, pickModelRequest)
+                        true
+                    } catch (e: Exception) {
+                        fileChooserCallback = null
+                        Toast.makeText(this@MainActivity, "Unable to open file picker", Toast.LENGTH_LONG).show()
+                        false
+                    }
                 }
             }
         }
+        setContentView(webView)
+        webView.loadUrl("file:///android_asset/model-viewer.html")
     }
 
-    private fun addButton(parent: LinearLayout, label: String, action: () -> Unit) {
-        val b = Button(this).apply {
-            text = label
-            textSize = 10f
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(112, 70, 145)))
-            setOnClickListener { action() }
+    @Deprecated("Deprecated in Android API; retained for broad device compatibility")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != pickModelRequest) return
+        val callback = fileChooserCallback ?: return
+        fileChooserCallback = null
+        if (resultCode != RESULT_OK || data == null) {
+            callback.onReceiveValue(null)
+            return
         }
-        parent.addView(b, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-            setMargins(dp(3), dp(4), dp(3), dp(4))
-        })
+        val uris = mutableListOf<Uri>()
+        data.clipData?.let { clip ->
+            for (i in 0 until clip.itemCount) uris += clip.getItemAt(i).uri
+        } ?: data.data?.let { uris += it }
+        callback.onReceiveValue(uris.toTypedArray())
     }
 
-    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    override fun onBackPressed() {
+        if (::webView.isInitialized && webView.canGoBack()) webView.goBack()
+        else super.onBackPressed()
+    }
+
+    override fun onDestroy() {
+        if (::webView.isInitialized) {
+            webView.loadUrl("about:blank")
+            webView.destroy()
+        }
+        fileChooserCallback?.onReceiveValue(null)
+        fileChooserCallback = null
+        super.onDestroy()
+    }
 }
