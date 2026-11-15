@@ -20,7 +20,11 @@ android {
         applicationId = "com.rapunzel.studio"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = providers.gradleProperty("appVersionCode").orNull?.toIntOrNull() ?: 2
+        versionName = providers.gradleProperty("appVersionName").orNull ?: "1.1.0"
     }
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.15.0")
 }
