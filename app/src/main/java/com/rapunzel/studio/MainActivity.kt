@@ -20,6 +20,8 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
@@ -55,8 +57,12 @@ class MainActivity : Activity() {
         downloadManager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
 
         val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(downloadReceiver, filter, RECEIVER_NOT_EXPORTED)
-        else @Suppress("DEPRECATION") registerReceiver(downloadReceiver, filter)
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(downloadReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(downloadReceiver, filter)
+        }
 
         webView = WebView(this).apply {
             setBackgroundColor(Color.rgb(35, 19, 54))
@@ -76,6 +82,24 @@ class MainActivity : Activity() {
     inner class UpdateBridge {
         @JavascriptInterface
         fun getAppVersion(): String = BuildConfig.VERSION_NAME
+
+        @JavascriptInterface
+        fun getLatestReleaseJson(): String {
+            var connection: HttpURLConnection? = null
+            return try {
+                connection = (URL("https://api.github.com/repos/redisgood2000/rapunzel-3d-studio/releases/latest").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 10000
+                    readTimeout = 15000
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+                }
+                if (connection.responseCode !in 200..299) "{\"error\":\"Release check unavailable\"}"
+                else connection.inputStream.bufferedReader().use { it.readText() }
+            } catch (_: Exception) {
+                "{\"error\":\"Unable to reach update service\"}"
+            } finally { connection?.disconnect() }
+        }
 
         @JavascriptInterface
         fun downloadUpdate(url: String) {
