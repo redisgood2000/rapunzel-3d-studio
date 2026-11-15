@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Rapunzel 3D Studio</title>
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#231336;--panel:#34204b;--accent:#9b70bd;--gold:#f3d59a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 30%,#50356b 0%,var(--bg) 68%);color:#fff;font-family:system-ui,-apple-system,sans-serif;min-height:100vh}
+header{padding:17px 16px 12px;text-align:center;background:#231336d9;position:relative;z-index:2}
+h1{font-size:19px;letter-spacing:1.5px;margin:0}header p{margin:5px 0 0;color:#d8c7e6;font-size:11px;letter-spacing:1px}
+.toolbar{display:flex;gap:8px;padding:10px 12px;justify-content:center;flex-wrap:wrap;background:#231336aa;position:relative;z-index:2}
+button,.pick{border:0;border-radius:22px;padding:11px 15px;background:var(--accent);color:#fff;font-weight:700;font-size:12px}
+button:active,.pick:active{transform:scale(.97)}button.secondary{background:#533b68}button.active{background:#e1b96f;color:#2c1b38}
+#stage{height:calc(100dvh - 222px);min-height:360px;position:relative}
+model-viewer{width:100%;height:100%;background:transparent;--poster-color:transparent;outline:none}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;color:#e8dcef;pointer-events:none}
+#empty .sparkle{font-size:54px;margin-bottom:12px}#empty strong{font-size:17px}#empty span{font-size:12px;line-height:1.6;max-width:280px;margin-top:8px;color:#cbb9d8}
+#status{font-size:11px;text-align:center;color:var(--gold);padding:2px 12px 8px;min-height:22px}
+#modelList{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:0 12px 8px}
+#modelList:empty{display:none}
+.hint{text-align:center;font-size:10px;color:#cbb9d8;padding:0 14px 12px}
+input{display:none}
+</style>
+</head>
+<body>
+<header><h1>RAPUNZEL 3D STUDIO</h1><p>CHARACTER MODEL VIEWER</p></header>
+<div class="toolbar">
+<label class="pick" for="files">＋ IMPORT GLB MODEL(S)</label>
+<button class="secondary" id="reset">⟲ RESET VIEW</button>
+<button class="secondary" id="spin">✧ AUTO ROTATE</button>
+</div>
+<input id="files" type="file" accept=".glb,model/gltf-binary,application/octet-stream" multiple>
+<div id="modelList"></div>
+<div id="stage">
+<model-viewer id="viewer" camera-controls touch-action="pan-y" shadow-intensity="1" exposure="1" environment-image="neutral" interaction-prompt="auto" camera-orbit="0deg 75deg 4m" min-camera-orbit="auto 10deg auto" max-camera-orbit="auto 170deg auto" alt="Imported 3D character model"></model-viewer>
+<div id="empty"><div class="sparkle">✨</div><strong>Your 3D character studio</strong><span>Tap IMPORT GLB MODEL(S), choose Rapunzel and/or Flynn, then drag to rotate and pinch to zoom.</span></div>
+</div>
+<div id="status">Ready · GLB models supported</div>
+<div class="hint">Drag to orbit · Pinch to zoom · Two-finger drag to pan · Tap RESET VIEW to recenter</div>
+<script>
+const viewer=document.querySelector('#viewer'),filesInput=document.querySelector('#files'),empty=document.querySelector('#empty'),list=document.querySelector('#modelList'),status=document.querySelector('#status');
+const models=[];let current=-1,spinning=false;
+function setStatus(t){status.textContent=t}
+function choose(i){if(i<0||i>=models.length)return;current=i;viewer.src=models[i].url;viewer.alt=models[i].name;empty.style.display='none';[...list.children].forEach((b,j)=>b.classList.toggle('active',j===i));setStatus('Viewing · '+models[i].name)}
+function addFile(file){if(!file.name.toLowerCase().endsWith('.glb')){setStatus('Skipped '+file.name+' · please select a .glb file');return}const url=URL.createObjectURL(file);const model={name:file.name.replace(/\.glb$/i,''),url};models.push(model);const b=document.createElement('button');b.className='secondary';b.textContent=model.name;b.addEventListener('click',()=>choose(models.indexOf(model)));list.appendChild(b);choose(models.length-1)}
+filesInput.addEventListener('change',e=>{const selected=[...e.target.files];if(!selected.length)return;selected.forEach(addFile);filesInput.value=''});
+document.querySelector('#reset').addEventListener('click',()=>{viewer.cameraOrbit='0deg 75deg 4m';viewer.fieldOfView='30deg';viewer.jumpCameraToGoal();setStatus('Camera view reset')});
+document.querySelector('#spin').addEventListener('click',e=>{spinning=!spinning;viewer.autoRotate=spinning;e.currentTarget.classList.toggle('active',spinning);e.currentTarget.textContent=spinning?'Ⅱ STOP ROTATION':'✧ AUTO ROTATE'});
+viewer.addEventListener('load',()=>setStatus('Model loaded · drag or pinch to inspect'));
+viewer.addEventListener('error',()=>setStatus('Could not load this model. Please choose a valid GLB file.'));
+window.addEventListener('beforeunload',()=>models.forEach(m=>URL.revokeObjectURL(m.url)));
+</script>
+</body></html>
